@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Braille: translate and practice</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#f4f5f7;color:#23262b;min-height:100vh;padding:24px 14px;display:flex;justify-content:center}
+main{width:100%;max-width:540px}
+h1{font-size:22px;margin-bottom:2px}
+.sub{color:#6b7280;font-size:13px;margin-bottom:18px}
+.card{background:#fff;border-radius:14px;box-shadow:0 6px 24px rgba(30,40,60,.08);padding:20px;margin-bottom:16px}
+label{font-size:12px;font-weight:600;color:#6b7280;display:block;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.04em}
+input,select{width:100%;padding:10px 12px;border:1.5px solid #d8dce3;border-radius:9px;font-size:16px;font-family:inherit}
+input:focus,select:focus{outline:none;border-color:#4f6bd8}
+.result{margin-top:14px;padding:14px;border-radius:10px;background:#eef1fa;display:none}
+.result.show{display:block}
+.big{font-size:22px;font-weight:700;color:#3a4fb0;letter-spacing:.1em}
+.kv{font-size:13px;color:#4b5563;margin-top:6px;line-height:1.5}
+a{color:#3a4fb0;text-decoration:none}
+footer{font-size:12px;color:#9aa1ad;text-align:center;margin-top:6px}
+.dots{display:inline-grid;grid-template-columns:repeat(2,16px);gap:5px;vertical-align:middle;margin:2px 4px}
+.dot{width:16px;height:16px;border-radius:50%;border:1.5px solid #9aa1ad;background:#fff}
+.dot.on{background:#3a4fb0;border-color:#3a4fb0}
+.quizopts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.qbtn{padding:9px 16px;border-radius:9px;border:1.5px solid #d8dce3;background:#fff;font-size:15px;cursor:pointer}
+.qbtn:hover{border-color:#4f6bd8}
+table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+td{padding:5px 4px;text-align:left;border-bottom:1px solid #e3e6ec}
+</style>
+</head>
+<body>
+<main>
+<h1>Braille</h1>
+<p class="sub">Grade 1 translator and dot-pattern trainer</p>
+<div class="card">
+<label for="plain">Text to braille</label>
+<input id="plain" placeholder="hello room 101" autocomplete="off">
+<div class="result" id="enc"></div>
+</div>
+<div class="card">
+<label for="bra">Braille to text (paste patterns)</label>
+<input id="bra" placeholder="&#x2813;&#x2811;&#x2807;&#x2807;&#x2815;" autocomplete="off">
+<div class="result" id="dec"></div>
+</div>
+<div class="card">
+<label>Practice: name the letter</label>
+<div id="quiz" style="margin-top:8px"></div>
+<div class="kv" id="score"></div>
+</div>
+<div class="card">
+<label>Alphabet reference</label>
+<div id="ref"></div>
+</div>
+<footer>Grade 1 (uncontracted) braille, dot numbering per the standard. <a href="index.html">About</a></footer>
+</main>
+<script src="engine.js"></script>
+<script>
+var $=function(id){return document.getElementById(id)};
+var esc=function(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;};
+function cell(dots){
+  var pos={1:0,4:1,2:2,5:3,3:4,6:5};
+  var h='<span class="dots">';
+  for(var p=0;p<6;p++){
+    var on=dots.some(function(d){return pos[d]===p;});
+    h+='<span class="dot'+(on?' on':'')+'"></span>';
+  }
+  return h+'</span>';
+}
+function enc(){
+  var t=$('plain').value;
+  var box=$('enc');
+  if(!t){box.classList.remove('show');return;}
+  var r=Braille.encode(t);
+  box.classList.add('show');
+  if(!r.ok){box.innerHTML='<span class="kv">'+esc(r.error)+'</span>';return;}
+  box.innerHTML='<div class="big">'+esc(r.braille)+'</div><div class="kv">Unicode braille patterns - copy them anywhere. Capitals take a dot-6 prefix, numbers a 3-4-5-6 prefix.</div>';
+}
+function dec(){
+  var t=$('bra').value;
+  var box=$('dec');
+  if(!t){box.classList.remove('show');return;}
+  var r=Braille.decode(t);
+  box.classList.add('show');
+  if(!r.ok){box.innerHTML='<span class="kv">'+esc(r.error)+'</span>';return;}
+  box.innerHTML='<div class="big" style="letter-spacing:normal">'+esc(r.text)+'</div>';
+}
+var score={ok:0,bad:0},answer=null;
+function quiz(){
+  var letters='abcdefghijklmnopqrstuvwxyz';
+  answer=letters[Math.floor(Math.random()*26)];
+  var dots=Braille.dotsOfLetter(answer);
+  var opts=[answer];
+  while(opts.length<4){
+    var c=letters[Math.floor(Math.random()*26)];
+    if(opts.indexOf(c)<0)opts.push(c);
+  }
+  opts.sort(function(){return Math.random()-0.5;});
+  var h='<div style="text-align:center;padding:8px">'+cell(dots)+'</div><div class="quizopts">';
+  opts.forEach(function(o){
+    h+='<button class="qbtn" data-l="'+o+'">'+o+'</button>';
+  });
+  $('quiz').innerHTML=h+'</div>';
+  $('quiz').querySelectorAll('.qbtn').forEach(function(b){
+    b.onclick=function(){
+      if(b.dataset.l===answer){score.ok++;$('score').textContent='Correct! '+score.ok+' right, '+score.bad+' missed.';}
+      else{score.bad++;$('score').textContent='It was '+answer+'. '+score.ok+' right, '+score.bad+' missed.';}
+      quiz();
+    };
+  });
+}
+var rt='<table>';
+'abcdefghijklmnopqrstuvwxyz'.split('').forEach(function(l){
+  rt+='<tr><td style="width:30px"><strong>'+l+'</strong></td><td>'+cell(Braille.dotsOfLetter(l))+'</td><td style="color:#6b7280">dots '+Braille.dotsOfLetter(l).join(', ')+'</td></tr>';
+});
+$('ref').innerHTML=rt+'</table>';
+$('plain').addEventListener('input',enc);
+$('bra').addEventListener('input',dec);
+quiz();
+</script>
+</body>
+</html>
